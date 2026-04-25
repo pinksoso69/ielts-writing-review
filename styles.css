@@ -309,6 +309,8 @@ textarea {
 }
 
 .sidebar-footer {
+  display: grid;
+  gap: 10px;
   margin-top: 16px;
   padding-top: 14px;
   border-top: 1px solid var(--line);
@@ -322,6 +324,26 @@ textarea {
   background: #eef5fb;
   color: var(--blue);
   font-weight: 760;
+}
+
+.backup-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.backup-actions .secondary-button,
+.import-backup-button {
+  display: inline-grid;
+  place-items: center;
+  width: 100%;
+  min-height: 38px;
+  padding: 0 8px;
+  font-size: 13px;
+}
+
+.import-backup-button input {
+  display: none;
 }
 
 .welcome-view {

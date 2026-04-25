@@ -35,6 +35,7 @@ const HIGHLIGHTS = [
 const STORAGE_KEY = "ielts-writing-review-v3";
 const LEGACY_KEYS = ["ielts-writing-review-v2", "ielts-writing-review-v1"];
 const PREF_KEY = "ielts-writing-review-preferences-v1";
+const BACKUP_VERSION = 1;
 const LIBRARY_PAGE_SIZE = 6;
 const SUMMARY_DEFAULT =
   "大作文：先判断题型，再决定段落任务。单边讨论要立场清晰，双边讨论要两边都回应，问题措施要原因和措施对应，复合问题要逐问回答。\n\n小作文：先写总览，再分组写细节。不要一上来堆数字，先看最高、最低、变化最大、趋势相反。\n\n考前提醒：少写空泛词，多写具体动作；注意 government / environment / convenient / comparison 这些易错拼写。";
@@ -188,6 +189,8 @@ const els = {
   editSummaryBtn: $("#editSummaryBtn"),
   saveSummaryBtn: $("#saveSummaryBtn"),
   openLibraryBtn: $("#openLibraryBtn"),
+  exportBackupBtn: $("#exportBackupBtn"),
+  importBackupInput: $("#importBackupInput"),
   libraryHomeBtn: $("#libraryHomeBtn"),
   libraryGroupLabel: $("#libraryGroupLabel"),
   libraryGroupSelect: $("#libraryGroupSelect"),
@@ -292,6 +295,66 @@ function inferTopic(tags = "") {
 function persist() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state.entries));
   localStorage.setItem(PREF_KEY, JSON.stringify({ highlightLabels: state.highlightLabels, examSummary: state.examSummary }));
+}
+
+function buildBackup() {
+  updateCurrentFromInputs();
+  return {
+    app: "ielts-writing-review",
+    version: BACKUP_VERSION,
+    exportedAt: new Date().toISOString(),
+    entries: clone(state.entries),
+    preferences: {
+      highlightLabels: { ...state.highlightLabels },
+      examSummary: state.examSummary,
+    },
+  };
+}
+
+function downloadBackup() {
+  const backup = buildBackup();
+  const date = new Date().toISOString().slice(0, 10);
+  const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `ielts-writing-review-backup-${date}.json`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+function importBackup(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.addEventListener("load", () => {
+    try {
+      const data = JSON.parse(String(reader.result || ""));
+      const entries = Array.isArray(data) ? data : data.entries;
+      if (!Array.isArray(entries)) throw new Error("Invalid backup");
+      if (!window.confirm("导入后会替换当前浏览器里的所有复盘数据，确定继续吗？")) return;
+
+      state.entries = entries.map(normalizeEntry);
+      const preferences = data.preferences || {};
+      state.highlightLabels = { ...Object.fromEntries(HIGHLIGHTS), ...(preferences.highlightLabels || {}) };
+      state.examSummary = preferences.examSummary || state.examSummary || SUMMARY_DEFAULT;
+      state.currentId = "";
+      state.mode = "task2";
+      state.libraryMode = "task2";
+      state.libraryGroup = "all";
+      state.libraryPage = 1;
+      state.bankTab = "collocations";
+      persist();
+      renderAll();
+      window.alert("导入完成。");
+    } catch {
+      window.alert("导入失败，请确认选择的是 IELTS Writing Review 的 JSON 备份文件。");
+    } finally {
+      els.importBackupInput.value = "";
+    }
+  });
+  reader.readAsText(file);
 }
 
 function currentEntry() {
@@ -712,6 +775,9 @@ function bindEvents() {
     els.appShell.classList.toggle("sidebar-collapsed");
     $("#collapseBtn").textContent = els.appShell.classList.contains("sidebar-collapsed") ? "›" : "‹";
   });
+
+  els.exportBackupBtn.addEventListener("click", downloadBackup);
+  els.importBackupInput.addEventListener("change", () => importBackup(els.importBackupInput.files[0]));
 
   $("#newEntryBtn").addEventListener("click", () => {
     updateCurrentFromInputs();
