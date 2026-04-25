@@ -127,7 +127,7 @@ h3 {
 }
 
 .annotated-layout {
-  position: relative;
+  display: grid;
   min-height: 620px;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -135,8 +135,7 @@ h3 {
 }
 
 .home-layout {
-  display: grid;
-  grid-template-columns: 260px 1fr;
+  grid-template-columns: 232px minmax(0, 1fr) 300px;
 }
 
 .mock-sidebar,
@@ -153,6 +152,14 @@ h3 {
   padding: 18px;
   border-right: 1px solid var(--line);
   background: #fbfcfd;
+}
+
+.home-layout .mock-sidebar {
+  grid-column: 1;
+}
+
+.home-layout .mock-workspace {
+  grid-column: 2;
 }
 
 .brand-row,
@@ -229,6 +236,24 @@ h3 {
   font-weight: 720;
 }
 
+.backup-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.backup-row span {
+  display: grid;
+  min-height: 36px;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 760;
+}
+
 .entry {
   padding: 12px;
   font-size: 14px;
@@ -302,7 +327,7 @@ h3 {
   min-height: 132px;
 }
 
-.metric-grid i {
+.metric-grid i:not(.note-mark) {
   display: block;
   height: 8px;
   margin-top: 13px;
@@ -310,11 +335,11 @@ h3 {
   background: linear-gradient(90deg, var(--blue), var(--green));
 }
 
-.metric-grid i:nth-child(3) {
+.metric-grid i:not(.note-mark):nth-of-type(1) {
   width: 64%;
 }
 
-.metric-grid i:nth-child(4) {
+.metric-grid i:not(.note-mark):nth-of-type(2) {
   width: 38%;
 }
 
@@ -330,7 +355,9 @@ h3 {
 
 .detail-layout,
 .library-layout {
+  grid-template-columns: minmax(0, 1fr) 300px;
   padding: 22px;
+  gap: 18px;
 }
 
 .detail-screen,
@@ -361,9 +388,24 @@ h3 {
 
 .prompt-card {
   display: grid;
-  grid-template-columns: 1fr 1fr 150px 150px 150px;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 10px;
   padding: 12px;
+}
+
+.prompt-card > div {
+  min-width: 0;
+}
+
+.prompt-card > div:nth-child(1),
+.prompt-card > div:nth-child(2) {
+  grid-column: span 3;
+}
+
+.prompt-card > div:nth-child(3),
+.prompt-card > div:nth-child(4),
+.prompt-card > div:nth-child(5) {
+  grid-column: span 2;
 }
 
 .prompt-card small {
@@ -481,27 +523,33 @@ h3 {
 }
 
 .callouts {
-  position: absolute;
-  inset: 0;
+  position: static;
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  min-width: 0;
   margin: 0;
-  padding: 0;
+  padding: 14px;
   list-style: none;
-  pointer-events: none;
+  border-left: 1px solid var(--line);
+  background: rgba(251, 252, 253, 0.72);
+  counter-reset: note;
 }
 
 .callouts li {
-  position: absolute;
-  left: var(--x);
-  top: var(--y);
-  width: 214px;
-  padding: 9px 10px 10px 34px;
+  position: relative;
+  left: auto;
+  top: auto;
+  width: auto;
+  min-height: 42px;
+  padding: 8px 9px 9px 33px;
   border: 1px solid rgba(49, 95, 143, 0.35);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.96);
-  box-shadow: 0 8px 18px rgba(24, 38, 54, 0.12);
+  box-shadow: 0 6px 14px rgba(24, 38, 54, 0.08);
   color: #243242;
-  font-size: 12px;
-  line-height: 1.45;
+  font-size: 11px;
+  line-height: 1.38;
   counter-increment: note;
 }
 
@@ -519,6 +567,35 @@ h3 {
   color: #fff;
   font-size: 11px;
   font-weight: 800;
+}
+
+.marked {
+  position: relative;
+}
+
+.note-mark {
+  position: absolute;
+  z-index: 3;
+  left: -9px;
+  top: -9px;
+  display: grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: var(--blue);
+  color: #fff;
+  box-shadow: 0 5px 12px rgba(24, 38, 54, 0.2);
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 850;
+  line-height: 1;
+}
+
+.circle .note-mark {
+  left: -12px;
+  top: -12px;
 }
 
 .shortcut-grid {
@@ -593,16 +670,7 @@ h3 {
   }
 
   .callouts {
-    position: static;
-    display: grid;
-    gap: 8px;
-    padding: 14px;
-  }
-
-  .callouts li {
-    position: relative;
-    left: auto;
-    top: auto;
-    width: auto;
+    border-top: 1px solid var(--line);
+    border-left: 0;
   }
 }
