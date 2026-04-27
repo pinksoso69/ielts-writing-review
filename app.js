@@ -214,6 +214,7 @@ function loadEntries() {
   const stored = localStorage.getItem(STORAGE_KEY);
   if (stored) {
     state.entries = JSON.parse(stored).map(normalizeEntry);
+    persist();
     return;
   }
 
@@ -238,8 +239,8 @@ function normalizeEntry(entry) {
     taskImage: entry.taskImage || "",
     prompt: entry.prompt || "",
     meaning: entry.meaning || "",
-    draftHtml: entry.draftHtml || textToHtml(entry.draft || ""),
-    modelHtml: entry.modelHtml || textToHtml(entry.model || ""),
+    draftHtml: cleanEditorHtml(entry.draftHtml || textToHtml(entry.draft || "")),
+    modelHtml: cleanEditorHtml(entry.modelHtml || textToHtml(entry.model || "")),
     draftScore: normalizeScore(entry.draftScore),
     modelScore: normalizeScore(entry.modelScore),
     bank: {
@@ -543,6 +544,8 @@ function renderEditor() {
   els.topicField.classList.toggle("hidden", entry.mode !== "task2");
   els.taskImageField.classList.toggle("hidden", entry.mode !== "task1");
   renderTaskImage(entry);
+  entry.draftHtml = cleanEditorHtml(entry.draftHtml);
+  entry.modelHtml = cleanEditorHtml(entry.modelHtml);
   els.draftEditor.innerHTML = entry.draftHtml;
   els.modelEditor.innerHTML = entry.modelHtml;
   els.draftScore.value = entry.draftScore || "";
@@ -923,6 +926,7 @@ function bindEvents() {
   });
 
   [els.draftEditor, els.modelEditor].forEach((editor) => {
+    editor.addEventListener("paste", (event) => handleEditorPaste(event, editor));
     editor.addEventListener("input", () => {
       updateCurrentFromInputs();
       updateStats();
@@ -1022,6 +1026,36 @@ function bindEvents() {
 function closeImageModal() {
   els.imageModal.classList.add("hidden");
   els.imageModalImg.removeAttribute("src");
+}
+
+function handleEditorPaste(event, editor) {
+  event.preventDefault();
+  const text = event.clipboardData?.getData("text/plain") || "";
+  if (!text) return;
+  insertPlainText(editor, text);
+  updateCurrentFromInputs();
+  updateStats();
+  persist();
+}
+
+function insertPlainText(editor, text) {
+  const selection = window.getSelection();
+  if (!selection || !selection.rangeCount) {
+    editor.appendChild(document.createTextNode(text));
+    return;
+  }
+  const range = selection.getRangeAt(0);
+  if (!editor.contains(range.commonAncestorContainer)) {
+    editor.appendChild(document.createTextNode(text));
+    return;
+  }
+  range.deleteContents();
+  const node = document.createTextNode(text);
+  range.insertNode(node);
+  range.setStartAfter(node);
+  range.setEndAfter(node);
+  selection.removeAllRanges();
+  selection.addRange(range);
 }
 
 function showToolbarForSelection(editor) {
@@ -1144,6 +1178,15 @@ function cleanEditorHtml(html) {
   const div = document.createElement("div");
   div.innerHTML = html || "";
   div.querySelectorAll("script, style").forEach((node) => node.remove());
+  div.querySelectorAll("*").forEach((node) => {
+    const highlight = node.dataset?.highlight || "";
+    const highlightColor = highlight || node.style?.backgroundColor || "";
+    [...node.attributes].forEach((attr) => node.removeAttribute(attr.name));
+    if (highlight) {
+      node.dataset.highlight = highlight;
+      node.style.backgroundColor = highlightColor;
+    }
+  });
   return div.innerHTML;
 }
 

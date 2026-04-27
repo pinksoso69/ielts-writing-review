@@ -914,6 +914,13 @@ textarea {
   white-space: pre-wrap;
 }
 
+.rich-editor,
+.rich-editor * {
+  font-family: inherit !important;
+  font-size: inherit !important;
+  line-height: inherit !important;
+}
+
 .highlight-legend {
   display: flex;
   flex-wrap: wrap;
