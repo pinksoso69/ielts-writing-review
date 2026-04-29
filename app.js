@@ -26,11 +26,17 @@ const BANK_SCHEMAS = {
 };
 
 const HIGHLIGHTS = [
-  ["#fff0a6", "好表达 / 可复用"],
-  ["#ffd8d2", "错误 / 待修改"],
-  ["#d9ecff", "逻辑 / 结构"],
-  ["#dff5e8", "搭配 / 句型"],
+  ["#ffe998", "好表达 / 可复用"],
+  ["#ffc9c1", "错误 / 待修改"],
+  ["#b9dcff", "逻辑 / 结构"],
+  ["#c7efd5", "搭配 / 句型"],
 ];
+const HIGHLIGHT_COLOR_MIGRATIONS = {
+  "#fff0a6": "#ffe998",
+  "#ffd8d2": "#ffc9c1",
+  "#d9ecff": "#b9dcff",
+  "#dff5e8": "#c7efd5",
+};
 
 const STORAGE_KEY = "ielts-writing-review-v3";
 const LEGACY_KEYS = ["ielts-writing-review-v2", "ielts-writing-review-v1"];
@@ -134,6 +140,8 @@ const state = {
   selectedEditor: null,
   selectedText: "",
   highlightLabels: Object.fromEntries(HIGHLIGHTS),
+  bankLabels: clone(BANK_SCHEMAS),
+  editingBankLabels: false,
   examSummary: SUMMARY_DEFAULT,
   editingSummary: false,
 };
@@ -182,6 +190,8 @@ const els = {
   highlightLegend: $("#highlightLegend"),
   bankSubmenu: $("#bankSubmenu"),
   detailBankTabs: $("#detailBankTabs"),
+  editBankLabelsBtn: $("#editBankLabelsBtn"),
+  bankLabelEditor: $("#bankLabelEditor"),
   thinkingPrimaryLabel: $("#thinkingPrimaryLabel"),
   thinkingSecondaryLabel: $("#thinkingSecondaryLabel"),
   summaryDisplay: $("#summaryDisplay"),
@@ -207,7 +217,8 @@ function loadEntries() {
   const prefs = localStorage.getItem(PREF_KEY);
   if (prefs) {
     const parsed = JSON.parse(prefs);
-    state.highlightLabels = { ...state.highlightLabels, ...(parsed.highlightLabels || {}) };
+    state.highlightLabels = mergeHighlightLabels(parsed.highlightLabels);
+    state.bankLabels = mergeBankLabels(parsed.bankLabels);
     state.examSummary = parsed.examSummary || state.examSummary;
   }
 
@@ -293,9 +304,32 @@ function inferTopic(tags = "") {
   return TASK2_TOPICS.find((topic) => tags.includes(topic)) || "";
 }
 
+function mergeBankLabels(labels = {}) {
+  return {
+    task2: { ...BANK_SCHEMAS.task2, ...(labels.task2 || {}) },
+    task1: { ...BANK_SCHEMAS.task1, ...(labels.task1 || {}) },
+  };
+}
+
+function mergeHighlightLabels(labels = {}) {
+  const merged = { ...Object.fromEntries(HIGHLIGHTS) };
+  Object.entries(labels || {}).forEach(([color, label]) => {
+    merged[HIGHLIGHT_COLOR_MIGRATIONS[color] || color] = label;
+  });
+  return merged;
+}
+
+function getBankSchema(mode) {
+  const defaults = BANK_SCHEMAS[mode] || BANK_SCHEMAS.task2;
+  return { ...defaults, ...(state.bankLabels[mode] || {}) };
+}
+
 function persist() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state.entries));
-  localStorage.setItem(PREF_KEY, JSON.stringify({ highlightLabels: state.highlightLabels, examSummary: state.examSummary }));
+  localStorage.setItem(
+    PREF_KEY,
+    JSON.stringify({ highlightLabels: state.highlightLabels, bankLabels: state.bankLabels, examSummary: state.examSummary }),
+  );
 }
 
 function buildBackup() {
@@ -307,6 +341,7 @@ function buildBackup() {
     entries: clone(state.entries),
     preferences: {
       highlightLabels: { ...state.highlightLabels },
+      bankLabels: clone(state.bankLabels),
       examSummary: state.examSummary,
     },
   };
@@ -338,7 +373,8 @@ function importBackup(file) {
 
       state.entries = entries.map(normalizeEntry);
       const preferences = data.preferences || {};
-      state.highlightLabels = { ...Object.fromEntries(HIGHLIGHTS), ...(preferences.highlightLabels || {}) };
+      state.highlightLabels = mergeHighlightLabels(preferences.highlightLabels);
+      state.bankLabels = mergeBankLabels(preferences.bankLabels);
       state.examSummary = preferences.examSummary || state.examSummary || SUMMARY_DEFAULT;
       state.currentId = "";
       state.mode = "task2";
@@ -582,7 +618,7 @@ function showLibrary() {
 }
 
 function renderLibrary() {
-  const schema = BANK_SCHEMAS[state.libraryMode];
+  const schema = getBankSchema(state.libraryMode);
   if (!schema[state.libraryBankTab]) state.libraryBankTab = Object.keys(schema)[0];
   renderLibraryGroups();
   els.libraryBankTabs.innerHTML = Object.entries(schema)
@@ -684,7 +720,7 @@ function renderTaskImage(entry) {
 }
 
 function renderBankTabs(mode) {
-  const schema = BANK_SCHEMAS[mode] || BANK_SCHEMAS.task2;
+  const schema = getBankSchema(mode);
   if (!schema[state.bankTab]) state.bankTab = Object.keys(schema)[0];
   const tabs = Object.entries(schema)
     .map(
@@ -694,6 +730,7 @@ function renderBankTabs(mode) {
     .join("");
   els.detailBankTabs.innerHTML = tabs;
   els.bankText.value = currentEntry()?.bank[state.bankTab] || "";
+  renderBankLabelEditor(mode);
 }
 
 function renderCorrections() {
@@ -722,8 +759,36 @@ function renderHighlightLegend() {
   ).join("");
 }
 
+function renderBankLabelEditor(mode) {
+  els.bankLabelEditor.classList.toggle("hidden", !state.editingBankLabels);
+  els.editBankLabelsBtn.textContent = state.editingBankLabels ? "取消编辑" : "编辑标签";
+  if (!state.editingBankLabels) {
+    els.bankLabelEditor.innerHTML = "";
+    return;
+  }
+
+  const schema = getBankSchema(mode);
+  const inputs = Object.entries(schema)
+    .map(
+      ([key, label]) => `
+        <label>
+          <span>${escapeHtml(BANK_SCHEMAS[mode][key] || key)}</span>
+          <input data-bank-label="${key}" value="${escapeHtml(label)}" />
+        </label>
+      `,
+    )
+    .join("");
+  els.bankLabelEditor.innerHTML = `
+    <div class="bank-label-fields">${inputs}</div>
+    <div class="bank-label-actions">
+      <button class="secondary-button" data-bank-label-reset type="button">恢复默认</button>
+      <button class="primary-button" data-bank-label-save type="button">保存标签</button>
+    </div>
+  `;
+}
+
 function renderBankSubmenu() {
-  const schema = BANK_SCHEMAS[currentEntry()?.mode || state.mode] || BANK_SCHEMAS.task2;
+  const schema = getBankSchema(currentEntry()?.mode || state.mode);
   els.bankSubmenu.innerHTML = Object.entries(schema)
     .map(([key, label]) => `<button data-add-bank="${key}">${label}</button>`)
     .join("");
@@ -991,6 +1056,32 @@ function bindEvents() {
     renderAll();
   });
 
+  els.editBankLabelsBtn.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    state.editingBankLabels = !state.editingBankLabels;
+    renderBankTabs(currentEntry()?.mode || state.mode);
+  });
+
+  els.bankLabelEditor.addEventListener("click", (event) => {
+    const entry = currentEntry();
+    if (!entry) return;
+    if (event.target.closest("[data-bank-label-reset]")) {
+      state.bankLabels[entry.mode] = { ...BANK_SCHEMAS[entry.mode] };
+      persist();
+      renderAll();
+      return;
+    }
+    if (!event.target.closest("[data-bank-label-save]")) return;
+    els.bankLabelEditor.querySelectorAll("[data-bank-label]").forEach((input) => {
+      const key = input.dataset.bankLabel;
+      state.bankLabels[entry.mode][key] = input.value.trim() || BANK_SCHEMAS[entry.mode][key];
+    });
+    state.editingBankLabels = false;
+    persist();
+    renderAll();
+  });
+
   $("#addCorrectionBtn").addEventListener("click", (event) => {
     event.preventDefault();
     addCorrection({ source: "", fix: "", comment: "", kind: "语法" });
@@ -1179,7 +1270,7 @@ function cleanEditorHtml(html) {
   div.innerHTML = html || "";
   div.querySelectorAll("script, style").forEach((node) => node.remove());
   div.querySelectorAll("*").forEach((node) => {
-    const highlight = node.dataset?.highlight || "";
+    const highlight = HIGHLIGHT_COLOR_MIGRATIONS[node.dataset?.highlight] || node.dataset?.highlight || "";
     const highlightColor = highlight || node.style?.backgroundColor || "";
     [...node.attributes].forEach((attr) => node.removeAttribute(attr.name));
     if (highlight) {
